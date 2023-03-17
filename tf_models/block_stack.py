@@ -12,23 +12,20 @@ class BlockStack(Layer):
         for i in range(num_block):
             block = None
             if share_weight:
-                block = Sequential([ConvBNActBlock(channels, channels,
+                block = Sequential([ConvBNActBlock(channels,
                                                    kernel_size=3, strides=1,
                                                    padding=1, use_bn=use_bn,
                                                    activation=activation),
-                                    ConvBNActBlock(in_channels=channels,
-                                                   out_channels=channels,
+                                    ConvBNActBlock(channels,
                                                    kernel_size=3, strides=1,
                                                    padding=1, use_bn=use_bn,
                                                    activation=activation)])
             else:
-                block = Sequential([ConvBNActBlock(in_channels=channels,
-                                                   out_channels=channels,
+                block = Sequential([ConvBNActBlock(channels,
                                                    kernel_size=3, strides=1,
                                                    padding=1, use_bn=use_bn,
                                                    activation=activation),
-                                    ConvBNActBlock(in_channels=channels,
-                                                   out_channels=channels,
+                                    ConvBNActBlock(channels,
                                                    kernel_size=3, strides=1,
                                                    padding=1, use_bn=use_bn,
                                                    activation=activation)])

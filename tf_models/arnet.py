@@ -1,3 +1,4 @@
+import tensorflow as tf
 from conv_bn_act_block import ConvBNActBlock
 from block_stack import BlockStack
 from tensorflow.keras.layers import Layer
@@ -5,6 +6,7 @@ from tensorflow.nn import space_to_depth, depth_to_space
 from tensorflow import concat
 from tensorflow.image import resize
 from tensorflow.keras import Model
+from pipeline import save_tflite
 
 class ARNet(Model):
 
@@ -21,9 +23,7 @@ class ARNet(Model):
             print('"activation" error!')
             exit(0)
 
-        self.conv0 = ConvBNActBlock(
-            in_channels=(in_channels - 1) * shuffle_rate ** 2 + 1,
-            out_channels=middle_channels,
+        self.conv0 = ConvBNActBlock(out_channels=middle_channels,
             kernel_size=3, strides=1, padding=1,
             use_bn=use_bn, activation=activation
         )
@@ -32,9 +32,7 @@ class ARNet(Model):
             num_block=num_block, share_weight=share_weight, connect_mode=connect_mode,
             use_bn=use_bn, activation=activation
         )
-        self.conv1 = ConvBNActBlock(
-            in_channels=middle_channels,
-            out_channels=out_channels * shuffle_rate ** 2,
+        self.conv1 = ConvBNActBlock(out_channels=out_channels * shuffle_rate ** 2,
             kernel_size=3, strides=1, padding=1,
             use_bn=False, activation=None
         )
@@ -44,23 +42,34 @@ class ARNet(Model):
         h_re = h // self.shuffle_rate * self.shuffle_rate
         w_re = w // self.shuffle_rate * self.shuffle_rate
 
-        x = concat((image, defocus), axis=0)
+        x = concat((image, defocus), axis=-1)
         x = resize(x, size=(h_re, w_re))
         x = space_to_depth(x, self.shuffle_rate)
-        x = concat((x, gamma), axis=0)
+        x_shape = tf.shape(x)
+        ones = tf.ones((1, x.shape[1], x.shape[2], 1))
+        gamma = tf.math.scalar_mul(2, ones)
+        x = concat((x, gamma), axis=-1)
         x = self.conv0(x)
         x = self.block_stack(x)
         x = self.conv1(x)
-        x = self.depth_to_space(x, self.shuffle_rate)
+        x = depth_to_space(x, self.shuffle_rate)
         x = resize(x, size=(h, w))
 
         return x
 
 if __name__ == "__main__":
     from tensorflow import ones
-    shape = (2, 200, 200, 3)
-    data = ones(shape)
-    gamma = ones((2, 200, 200, 1))
+    from pipeline import save_tflite
+    from tensorflow.keras import Input
+    shape = (220, 220, 3)
+    data = ones((2, *shape))
+    gamma = 5
     net = ARNet()
-    net.call(data, data, gamma)
-    print(net.summary())
+    inputs=(Input(shape=shape), Input(shape=shape), Input(shape=(1,)))
+    m = Model(inputs, outputs=(net(*inputs),))
+    # m.build(input_shape=(shape, shape, (1,)))
+    m.compile(optimizer='adam',
+              loss=tf.keras.losses.MeanSquaredError(),
+              metrics=['accuracy'])
+    print(m.summary(expand_nested=True))
+    save_tflite(m, "/tmp/arnet.tflite")

@@ -8,11 +8,10 @@ class ConvBNActBlock(Layer):
         Conv block
     """
 
-    def __init__(self, in_channels, out_channels, kernel_size, strides, padding,
+    def __init__(self, out_channels, kernel_size, strides, padding,
                  use_bn, activation, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.conv = Conv2D(in_channels, kernel_size, strides=strides,
-                           padding=(padding, padding))
+        self.conv = Conv2D(out_channels, kernel_size=kernel_size, padding="SAME")
 
         self.bn = None
         if use_bn:
@@ -25,7 +24,6 @@ class ConvBNActBlock(Layer):
             self.activation = LeakyReLU()
         elif activation == 'elu':
             self.activation = ELU()
-
 
     def call(self, x):
         x = self.conv(x)
